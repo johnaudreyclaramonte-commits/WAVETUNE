@@ -16,104 +16,249 @@ body {
     background: linear-gradient(135deg, #3d1e9e, #d1c96b);
     color: white;
 }
+
+/* SIDEBAR */
 .sidebar {
-    width: 250px;
-    background: rgba(0,0,0,.35);
+    width: 240px;
+    background: rgba(0,0,0,0.45);
     padding: 20px;
 }
 .sidebar a {
     display: block;
     padding: 10px;
-    color: #ccc;
-    text-decoration: none;
+    margin-bottom: 6px;
     border-radius: 8px;
-    margin-bottom: 5px;
+    color: #ddd;
+    text-decoration: none;
 }
-.sidebar a.active,
+.sidebar a.active {
+    background: #ffc107;
+    color: #000;
+    font-weight: bold;
+}
 .sidebar a:hover {
-    background: rgba(255,255,255,.2);
-    color: white;
+    background: rgba(255,255,255,0.3);
 }
+
+/* MAIN */
 .main {
     flex: 1;
     padding: 20px;
+    overflow-y: auto;
 }
 .page { display: none; }
 .page.active { display: block; }
+
+/* PLAYLIST */
 .playlist-card {
-    background: rgba(255,255,255,.15);
+    background: rgba(255,255,255,0.15);
     padding: 20px;
     border-radius: 15px;
-    cursor: pointer;
     text-align: center;
+    cursor: pointer;
+}
+.playlist-card:hover {
+    background: rgba(255,193,7,0.5);
+}
+
+/* SONG LIST */
+.list-group-item {
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border: none;
+}
+.list-group-item:hover {
+    background: rgba(255,193,7,0.4);
+}
+.list-group-item.active {
+    background: #ffc107 !important;
+    color: #000 !important;
+    font-weight: bold;
+}
+
+/* FORM */
+.form-control, .form-select {
+    background: #2b2b2b;
+    color: #ffc107;
+    border: 1px solid #ffc107;
+}
+.form-control::placeholder {
+    color: #ccc;
+}
+.form-select option {
+    background: #1f1f1f;
+    color: white;
 }
 </style>
 </head>
 
 <body>
 
+<!-- SIDEBAR -->
 <div class="sidebar">
-    <h3 class="text-center">WAVETUNE</h3>
+    <h4 class="text-center">WAVETUNE</h4>
     <a class="nav-link active" data-page="home">Home</a>
     <a class="nav-link" data-page="playlist">Playlist</a>
     <a class="nav-link" data-page="addsongs">Add Songs</a>
     <a class="nav-link" data-page="nowplaying">Now Playing</a>
 </div>
 
+<!-- MAIN -->
 <div class="main">
 
+<!-- HOME -->
 <section id="home" class="page active">
     <h3>Your Playlists</h3>
-    <div class="row g-3">
-        <div class="col-md-3"><div class="playlist-card" data-playlist="Chill Vibes">Chill Vibes</div></div>
-        <div class="col-md-3"><div class="playlist-card" data-playlist="Workout Mix">Workout Mix</div></div>
-        <div class="col-md-3"><div class="playlist-card" data-playlist="Road Trip">Road Trip</div></div>
-    </div>
+    <button id="addPlaylistBtn" class="btn btn-success mb-3">+ Add Playlist</button>
+    <div class="row g-3" id="playlistCards"></div>
 </section>
 
+<!-- PLAYLIST -->
 <section id="playlist" class="page">
     <h3 id="currentPlaylistTitle">Playlist</h3>
-    <ul id="playlistSongs"></ul>
+    <input id="searchSong" class="form-control my-2" placeholder="Search song">
+    <ul id="playlistSongs" class="list-group"></ul>
 </section>
 
+<!-- ADD SONG -->
 <section id="addsongs" class="page">
-    <h3>Add Song</h3>
-    <input id="ytLink" placeholder="YouTube link">
-    <button id="addSongBtn">Add</button>
+    <h3>Add YouTube Song</h3>
+    <select id="playlistSelect" class="form-select w-50 mb-2"></select>
+    <input id="ytLink" class="form-control w-50 mb-2" placeholder="Paste YouTube link">
+    <button id="addSongBtn" class="btn btn-primary">Add Song</button>
 </section>
 
-<section id="nowplaying" class="page">
+<!-- NOW PLAYING -->
+<section id="nowplaying" class="page text-center">
     <h3 id="nowTitle">No song playing</h3>
-    <iframe id="ytPlayer" width="560" height="315"></iframe>
+    <img id="songThumb" class="img-fluid rounded my-3" style="max-width:300px">
+    <div class="ratio ratio-16x9 mx-auto" style="max-width:500px">
+        <iframe id="ytPlayer" allowfullscreen></iframe>
+    </div>
 </section>
 
 </div>
 
 <script>
+/* DOM */
 const pages = document.querySelectorAll(".page");
-const links = document.querySelectorAll(".nav-link");
+const navs = document.querySelectorAll(".nav-link");
+const playlistCards = document.getElementById("playlistCards");
+const playlistSongs = document.getElementById("playlistSongs");
+const playlistSelect = document.getElementById("playlistSelect");
+const currentPlaylistTitle = document.getElementById("currentPlaylistTitle");
+const nowTitle = document.getElementById("nowTitle");
+const songThumb = document.getElementById("songThumb");
+const ytPlayer = document.getElementById("ytPlayer");
+const searchSong = document.getElementById("searchSong");
 
-links.forEach(link => {
-    link.onclick = () => {
-        links.forEach(l => l.classList.remove("active"));
+/* NAV */
+navs.forEach(n => {
+    n.onclick = () => {
+        navs.forEach(x => x.classList.remove("active"));
         pages.forEach(p => p.classList.remove("active"));
-        link.classList.add("active");
-        document.getElementById(link.dataset.page).classList.add("active");
+        n.classList.add("active");
+        document.getElementById(n.dataset.page).classList.add("active");
     };
 });
 
-let playlists = {
+/* DATA */
+let playlists = JSON.parse(localStorage.getItem("wavetune")) || {
     "Chill Vibes": [],
     "Workout Mix": [],
     "Road Trip": []
 };
+let activeSongIndex = null;
 
-document.querySelectorAll(".playlist-card").forEach(card => {
-    card.onclick = () => {
-        document.getElementById("currentPlaylistTitle").textContent = card.dataset.playlist;
-        document.querySelector('[data-page="playlist"]').click();
-    };
-});
+function save() {
+    localStorage.setItem("wavetune", JSON.stringify(playlists));
+}
+
+/* RENDER HOME */
+function renderHome() {
+    playlistCards.innerHTML = "";
+    playlistSelect.innerHTML = "";
+
+    Object.keys(playlists).forEach(name => {
+        playlistCards.innerHTML += `
+            <div class="col-md-3">
+                <div class="playlist-card" data-name="${name}">${name}</div>
+            </div>`;
+        playlistSelect.innerHTML += `<option>${name}</option>`;
+    });
+
+    document.querySelectorAll(".playlist-card").forEach(card => {
+        card.onclick = () => openPlaylist(card.dataset.name);
+    });
+}
+
+/* OPEN PLAYLIST */
+function openPlaylist(name) {
+    currentPlaylistTitle.textContent = name;
+    renderPlaylist(name);
+    document.querySelector('[data-page="playlist"]').click();
+}
+
+/* RENDER PLAYLIST */
+function renderPlaylist(name) {
+    playlistSongs.innerHTML = "";
+    playlists[name].forEach((song, i) => {
+        if (!song.title.toLowerCase().includes(searchSong.value.toLowerCase())) return;
+        const li = document.createElement("li");
+        li.className = "list-group-item";
+        li.textContent = song.title;
+        if (i === activeSongIndex) li.classList.add("active");
+        li.onclick = () => {
+            activeSongIndex = i;
+            playSong(song);
+            renderPlaylist(name);
+        };
+        playlistSongs.appendChild(li);
+    });
+}
+
+/* PLAY SONG */
+function playSong(song) {
+    nowTitle.textContent = song.title;
+    songThumb.src = `https://img.youtube.com/vi/${song.videoId}/hqdefault.jpg`;
+    ytPlayer.src = `https://www.youtube.com/embed/${song.videoId}?autoplay=1`;
+    document.querySelector('[data-page="nowplaying"]').click();
+}
+
+/* ADD SONG */
+document.getElementById("addSongBtn").onclick = () => {
+    const link = document.getElementById("ytLink").value;
+    const playlist = playlistSelect.value;
+    if (!link) return alert("Enter a YouTube link");
+
+    const id = link.includes("youtu.be")
+        ? link.split("youtu.be/")[1].split("?")[0]
+        : link.split("watch?v=")[1].split("&")[0];
+
+    playlists[playlist].push({
+        title: "YouTube Song " + (playlists[playlist].length + 1),
+        videoId: id
+    });
+
+    save();
+    renderPlaylist(playlist);
+    document.getElementById("ytLink").value = "";
+};
+
+/* ADD PLAYLIST */
+document.getElementById("addPlaylistBtn").onclick = () => {
+    const name = prompt("Playlist name:");
+    if (!name || playlists[name]) return;
+    playlists[name] = [];
+    save();
+    renderHome();
+};
+
+/* SEARCH */
+searchSong.oninput = () => renderPlaylist(currentPlaylistTitle.textContent);
+
+/* INIT */
+renderHome();
 </script>
 
 </body>
